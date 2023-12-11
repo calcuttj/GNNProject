@@ -4,8 +4,11 @@ import torch
 import model, BeamFeatures
 from torch_geometric.loader import DataLoader
 
+def check_batchnum(args, batchnum):
+  return (args.max_train_batch > 0 and batchnum >= args.max_train_batch)
+
 def run_test(test_loader, device):
-  print('Running test')
+  print('Running test', len(test_loader), 'batches')
   #losses = []
   running_loss = 0.
   with torch.no_grad():
@@ -28,6 +31,7 @@ if __name__ == '__main__':
   parser = ap()
   parser.add_argument('--train', required=True, type=str)
   parser.add_argument('--batch', type=int, default=16)
+  parser.add_argument('--max_train_batch', type=int, default=-1)
   parser.add_argument('--epoch', type=int, default=1)
   parser.add_argument('--test', default=None, type=str)
   parser.add_argument('--save', default=None, type=str)
@@ -72,9 +76,10 @@ if __name__ == '__main__':
 
   net.train()
   for i in range(args.epoch):
-    print(f'EPOCH {i}')
+    print(f'EPOCH {i}', len(train_loader), 'batches')
     running_loss = 0.
     for batchnum, batch in enumerate(train_loader):
+      if check_batchnum(args, batchnum): break
       optimizer.zero_grad()
       batch.to(device)
       pred = net(batch, batch.batch)
@@ -88,6 +93,8 @@ if __name__ == '__main__':
         print(f'\n(Batch {batchnum}) Loss: {running_loss / 100.}')
         running_loss = 0.
       losses.append(theloss)
+
+
     if args.test is not None:
       test_results = run_test(test_loader, device)
       #test_losses.append(test_results['losses'])
