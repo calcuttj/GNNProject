@@ -57,10 +57,14 @@ class BeamFeatures(GraphDataset):
         )
         #edge_index = self.file_handle['edge_indices'][idx].reshape(-1, 2)
         
+        truth = torch.tensor(
+            self._file_handle['truth'][idx].reshape(-1,6),
+            dtype=torch.float32
+        )
         return GraphData(x = node_features,
                          edge_index = edge_index,
                          edge_attr = edge_features,
-                         y = None,
+                         y = truth,
                          edge_label = None,
                          index = idx)
 

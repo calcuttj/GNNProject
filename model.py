@@ -123,8 +123,8 @@ class GNNModel(nn.Module):
         #self.node_predictor = nn.Linear(node_output, 2)
         #self.edge_predictor = nn.Linear(edge_output, 2)
         self.global_predictor = nn.Sequential(
-          nn.Linear(node_output, 1),
-          nn.Sigmoid()
+          nn.Linear(node_output, 6),
+          nn.Softmax(dim=1)
         )
 
     def forward(self, data, batch):
