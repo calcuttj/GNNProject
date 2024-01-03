@@ -8,7 +8,7 @@ from torch_geometric.loader import DataLoader
 def check_batchnum(maxnum, batchnum):
   return (maxnum > 0 and batchnum >= maxnum)
 
-def run_test(test_loader, device):
+def run_test(test_loader, device, loss_fn):
   print('Running test', len(test_loader), 'batches')
   #losses = []
   running_loss = 0.
@@ -47,9 +47,10 @@ if __name__ == '__main__':
   parser.add_argument('--test', default=None, type=str)
   parser.add_argument('--save', default=None, type=str)
   parser.add_argument('--weights', default=None, type=str)
+  parser.add_argument('--norm', default=None, type=str)
   args = parser.parse_args()
 
-  bf_train = BeamFeatures.BeamFeatures(args.train)
+  bf_train = BeamFeatures.BeamFeatures(args.train, args.norm)
   train_loader = DataLoader(
       bf_train,
       shuffle=True,
@@ -58,7 +59,7 @@ if __name__ == '__main__':
   )
 
   if args.test is not None:
-    bf_test = BeamFeatures.BeamFeatures(args.test)
+    bf_test = BeamFeatures.BeamFeatures(args.test, args.norm)
     test_loader = DataLoader(
         bf_test,
         shuffle=False,
@@ -66,21 +67,25 @@ if __name__ == '__main__':
         batch_size=args.batch,
     )
 
-  if args.weights is not None:
-    #TODO -- finish setting up weights from yaml
-    #weight=torch.tensor(self.weights).float().to(self.device)
-    pass
-
-  net = model.GNNModel()
-
-  loss_fn = torch.nn.BCELoss(reduction='mean')
-  optimizer = torch.optim.Adam(net.parameters(), lr=0.01, weight_decay=5e-4)
-  
   # check if a GPU is available. Otherwise run on CPU
   device = 'cpu'
   args_cuda = torch.cuda.is_available()
   if args_cuda: device = "cuda:0"
   print('device : ',device)
+
+  weights = None
+  if args.weights is not None:
+    #TODO -- finish setting up weights from yaml
+    with h5.File(args.weights, 'r') as fweight:
+      weights = torch.tensor(fweight['weights']).float().to(device)
+      
+
+  net = model.GNNModel()
+
+  #loss_fn = torch.nn.BCELoss(reduction='mean', weight=weights)
+  loss_fn = torch.nn.CrossEntropyLoss(reduction='mean', weight=weights)
+  optimizer = torch.optim.Adam(net.parameters(), lr=0.01, weight_decay=5e-4)
+  
   net.to(device)
   
   losses = []
@@ -90,7 +95,7 @@ if __name__ == '__main__':
   test_accuracies = []
 
   if args.test is not None:
-    test_results = run_test(test_loader, device)
+    test_results = run_test(test_loader, device, loss_fn)
     test_ave_losses.append(test_results['ave_loss'])
     test_accuracies.append(test_results['accuracy'])
 
@@ -120,7 +125,7 @@ if __name__ == '__main__':
 
 
     if args.test is not None:
-      test_results = run_test(test_loader, device)
+      test_results = run_test(test_loader, device, loss_fn)
       #test_losses.append(test_results['losses'])
       test_ave_losses.append(test_results['ave_loss'])
       test_accuracies.append(test_results['accuracy'])
