@@ -34,7 +34,7 @@ def run_test(net, test_loader, device, loss_fn, ndim=4):
       if check_batchnum(args.max_test_batch, batchnum): break
       batch.to(device)
       pred = net(batch, batch.batch)
-      loss = loss_fn(pred, batch.y)
+      loss = loss_fn(pred, batch.y.argmax(axis=1))
       theloss = loss.item()
       running_loss += theloss
       if not batchnum % 10: print(f'{batchnum}')
