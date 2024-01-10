@@ -65,6 +65,8 @@ if __name__ == '__main__':
   parser.add_argument('--norm', default=None, type=str)
   parser.add_argument('--style', default='interaction', type=str)
   parser.add_argument('--checkpoint', default=None, type=str)
+  parser.add_argument('--ave_charge', action='store_true')
+  parser.add_argument('--learning_rate', '--lr', type=float, default=1.e-2)
   args = parser.parse_args()
 
   good_styles = ['interaction', 'beam_frac', 'pdgs']
@@ -72,7 +74,7 @@ if __name__ == '__main__':
     combined = ', '.join(good_styles)
     raise Exception(f'Must supply --style as one of {combined}')
 
-  bf_train = BeamFeatures.BeamFeatures(args.train, args.norm, args.style)
+  bf_train = BeamFeatures.BeamFeatures(args.train, args.norm, args.style, ave_charge=args.ave_charge)
   train_loader = DataLoader(
       bf_train,
       shuffle=True,
@@ -81,7 +83,7 @@ if __name__ == '__main__':
   )
 
   if args.test is not None:
-    bf_test = BeamFeatures.BeamFeatures(args.test, args.norm, args.style)
+    bf_test = BeamFeatures.BeamFeatures(args.test, args.norm, args.style, ave_charge=args.ave_charge)
     test_loader = DataLoader(
         bf_test,
         shuffle=False,
@@ -102,15 +104,19 @@ if __name__ == '__main__':
       weights = torch.tensor(fweight['weights']).float().to(device)
       
 
-  net = model.GNNModel((args.style == 'beam_frac'),
-                       (6 if args.style == 'interaction' else 4))
+  net = model.GNNModel(
+      (args.style == 'beam_frac'),
+      outdim=(6 if args.style == 'interaction' else 4),
+      node_input=(4 if args.ave_charge else 9),
+      edge_input=(8 if args.ave_charge else 12),
+  )
 
   #loss_fn = torch.nn.BCELoss(reduction='mean', weight=weights)
   if args.style == 'beam_frac':
     loss_fn = torch.nn.MSELoss()
   else:
     loss_fn = torch.nn.CrossEntropyLoss(reduction='mean', weight=weights)
-  optimizer = torch.optim.Adam(net.parameters(), lr=0.01, weight_decay=5e-4)
+  optimizer = torch.optim.Adam(net.parameters(), lr=args.learning_rate, weight_decay=5e-4)
   
   net.to(device)
   

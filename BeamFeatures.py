@@ -76,11 +76,18 @@ class BeamFeatures(GraphDataset):
 
 
         edge_index = torch.tensor(vals[:,-2:], dtype=torch.long).t()
+        vals = vals[:,:-2]
 
         if self.ave_charge:
-          pass
+          new_vals = np.zeros((len(vals), 8))
+          new_vals[:,0:3] = vals[:,0:3] #delta pos
+          new_vals[:,3:6] = vals[:,6:9] #ave pos
+          new_vals[:,6] = np.mean(vals[:,3:6], axis=1)#delta C
+          new_vals[:,7] = np.mean(vals[:,9:12], axis=1) #ave c
+          vals = new_vals
+
         edge_features = torch.tensor(
-            (vals[:,:-2] - self.edge_means)/self.edge_stds,
+            (vals - self.edge_means)/self.edge_stds,
             dtype=torch.float32
         )
         #print(edge_index.shape, edge_features.shape)
