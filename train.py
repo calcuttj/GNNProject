@@ -1,20 +1,34 @@
 from argparse import ArgumentParser as ap
 import yaml
+import numpy as np
 import h5py as h5
 import torch
 import model, BeamFeatures
 from torch_geometric.loader import DataLoader
 
+def get_confusion(data, x, n=4):
+  confusion = np.zeros((n, n))
+  for i in range(n):
+      for j in range(n):
+          indices = np.where(x.argmax(axis=1) == i)
+          confusion[i,j] = (
+              data.y.argmax(axis=1)[indices] == j
+          ).sum()
+  return confusion
+
 def check_batchnum(maxnum, batchnum):
   return (maxnum > 0 and batchnum >= maxnum)
 
-def run_test(test_loader, device, loss_fn):
+def run_test(net, test_loader, device, loss_fn, ndim=4):
   print('Running test', len(test_loader), 'batches')
   #losses = []
   running_loss = 0.
   ngood = 0
   nevents = 0
   nbatches = 0
+  
+  total_confusion = np.zeros((ndim, ndim))
+  net.eval()
   with torch.no_grad():
     for batchnum, batch in enumerate(test_loader):
       if check_batchnum(args.max_test_batch, batchnum): break
@@ -28,6 +42,7 @@ def run_test(test_loader, device, loss_fn):
       ngood += (pred.argmax(axis=1) == batch.y.argmax(axis=1)).sum()
       nevents += len(batch)
       nbatches += 1
+      total_confusion += get_confusion(batch, pred, ndim)
     running_loss /= nbatches 
     accuracy = ngood/nevents
     return {
@@ -48,9 +63,16 @@ if __name__ == '__main__':
   parser.add_argument('--save', default=None, type=str)
   parser.add_argument('--weights', default=None, type=str)
   parser.add_argument('--norm', default=None, type=str)
+  parser.add_argument('--style', default='interaction', type=str)
+  parser.add_argument('--checkpoint', default=None, type=str)
   args = parser.parse_args()
 
-  bf_train = BeamFeatures.BeamFeatures(args.train, args.norm)
+  good_styles = ['interaction', 'beam_frac', 'pdgs']
+  if args.style not in good_styles:
+    combined = ', '.join(good_styles)
+    raise Exception(f'Must supply --style as one of {combined}')
+
+  bf_train = BeamFeatures.BeamFeatures(args.train, args.norm, args.style)
   train_loader = DataLoader(
       bf_train,
       shuffle=True,
@@ -59,7 +81,7 @@ if __name__ == '__main__':
   )
 
   if args.test is not None:
-    bf_test = BeamFeatures.BeamFeatures(args.test, args.norm)
+    bf_test = BeamFeatures.BeamFeatures(args.test, args.norm, args.style)
     test_loader = DataLoader(
         bf_test,
         shuffle=False,
@@ -80,10 +102,14 @@ if __name__ == '__main__':
       weights = torch.tensor(fweight['weights']).float().to(device)
       
 
-  net = model.GNNModel()
+  net = model.GNNModel((args.style == 'beam_frac'),
+                       (6 if args.style == 'interaction' else 4))
 
   #loss_fn = torch.nn.BCELoss(reduction='mean', weight=weights)
-  loss_fn = torch.nn.CrossEntropyLoss(reduction='mean', weight=weights)
+  if args.style == 'beam_frac':
+    loss_fn = torch.nn.MSELoss()
+  else:
+    loss_fn = torch.nn.CrossEntropyLoss(reduction='mean', weight=weights)
   optimizer = torch.optim.Adam(net.parameters(), lr=0.01, weight_decay=5e-4)
   
   net.to(device)
@@ -95,12 +121,12 @@ if __name__ == '__main__':
   test_accuracies = []
 
   if args.test is not None:
-    test_results = run_test(test_loader, device, loss_fn)
+    test_results = run_test(net, test_loader, device, loss_fn)
     test_ave_losses.append(test_results['ave_loss'])
     test_accuracies.append(test_results['accuracy'])
 
-  net.train()
   for i in range(args.epoch):
+    net.train()
     print(f'EPOCH {i}', len(train_loader), 'batches')
     running_loss = 0.
     for batchnum, batch in enumerate(train_loader):
@@ -108,7 +134,7 @@ if __name__ == '__main__':
       optimizer.zero_grad()
       batch.to(device)
       pred = net(batch, batch.batch)
-      loss = loss_fn(pred, batch.y)
+      loss = loss_fn(pred, batch.y) if (args.style == 'beam_frac') else loss_fn(pred, batch.y.argmax(axis=1))
       loss.backward()
       optimizer.step()
       theloss = loss.item()
@@ -125,7 +151,7 @@ if __name__ == '__main__':
 
 
     if args.test is not None:
-      test_results = run_test(test_loader, device, loss_fn)
+      test_results = run_test(net, test_loader, device, loss_fn)
       #test_losses.append(test_results['losses'])
       test_ave_losses.append(test_results['ave_loss'])
       test_accuracies.append(test_results['accuracy'])
@@ -139,3 +165,9 @@ if __name__ == '__main__':
       if args.test is not None:
         fsave['test_ave_losses'] = test_ave_losses
         fsave['test_accuracies'] = test_accuracies
+
+  if args.checkpoint is not None:
+    torch.save({
+      'model_state_dict': net.state_dict(),
+      'optimizer_state_dict': optimizer.state_dict(),
+    }, args.checkpoint)

@@ -10,12 +10,13 @@ def get_nedge_attrs(bf):
 
 if __name__ == '__main__':
   parser = ap()
-  parser.add_argument('-i', required=True)
+  parser.add_argument('-i', required=True, type=str)
   parser.add_argument('-o', default='weights.h5')
+  parser.add_argument('--style', default='interaction', type=str)
   args = parser.parse_args()
-  bf = BeamFeatures.BeamFeatures(args.i)
+  bf = BeamFeatures.BeamFeatures(args.i, style=args.style)
 
-  ys = np.zeros(6) 
+  ys = np.zeros(6 if args.style == 'interaction' else 4)
   nentries = len(bf)
 
 

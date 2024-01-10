@@ -88,7 +88,7 @@ class GlobalModel(torch.nn.Module):
         return self.global_mlp(out)
 
 class GNNModel(nn.Module):
-    def __init__(self):
+    def __init__(self, do_frac=False, outdim=6):
         super().__init__()
 
         # Initialize the updaters
@@ -107,6 +107,7 @@ class GNNModel(nn.Module):
           node_model=NodeModel(node_input, node_output, edge_output), #Add leakiness?
           global_model=GlobalModel(node_output, node_output), #Add leakiness?
         )
+        self.outdim = outdim
         #for i in range(self.num_mp):
         #    self.message_passing.append(
         #        MetaLayer(
@@ -122,10 +123,16 @@ class GNNModel(nn.Module):
         # Reduce the number of node and edge features edge, as we are performing a simple classification
         #self.node_predictor = nn.Linear(node_output, 2)
         #self.edge_predictor = nn.Linear(edge_output, 2)
-        self.global_predictor = nn.Sequential(
-          nn.Linear(node_output, 6),
-          nn.Softmax(dim=1)
-        )
+        if do_frac:
+          self.global_predictor = nn.Sequential(
+            nn.Linear(node_output, 1),
+            nn.Sigmoid()
+          )
+        else:
+          self.global_predictor = nn.Sequential(
+            nn.Linear(node_output, self.outdim),
+            nn.Softmax(dim=1)
+          )
 
     def forward(self, data, batch):
 
