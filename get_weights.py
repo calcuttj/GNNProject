@@ -16,7 +16,13 @@ if __name__ == '__main__':
   args = parser.parse_args()
   bf = BeamFeatures.BeamFeatures(args.i, style=args.style)
 
-  ys = np.zeros(6 if args.style == 'interaction' else 4)
+  ndims = {
+    'interaction':6,
+    'pdgs':4,
+    'track_vs_shower':2,
+  }
+
+  ys = np.zeros(ndims[args.style])
   nentries = len(bf)
 
 

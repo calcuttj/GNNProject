@@ -18,7 +18,7 @@ class BeamFeatures(GraphDataset):
         self._file_handle = None
         self.ave_charge = ave_charge
 
-        if style not in ["interaction", "beam_frac", "pdgs"]:
+        if style not in ["interaction", "beam_frac", "pdgs", "track_vs_shower"]:
           raise Exception(f"Unknown beam features style {style}")
         self.style=style
 
@@ -102,6 +102,18 @@ class BeamFeatures(GraphDataset):
             self._file_handle['truth_pdg'][idx].reshape(-1,4),
             dtype=torch.float32
           )
+        elif self.style == "track_vs_shower":
+          #truth_pdg = self._file_handle['truth_pdg'][idx].reshape(-1,4)
+          n = self._file_handle['truth_pdg'][idx].reshape(-1,4).shape[0]
+          truth = torch.tensor(
+            np.zeros((n,2)),
+            dtype=torch.float32
+          )
+          truth[:,0] = torch.tensor(
+            self._file_handle['truth_pdg'][idx].reshape(-1,4)[:,0]
+          )
+          truth[:,1] = 1. - truth[:,0]
+
         else:
           truth = torch.tensor(
               self._file_handle['truth'][idx].reshape(-1,6),

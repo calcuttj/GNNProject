@@ -12,8 +12,9 @@ if __name__ == '__main__':
   parser = ap()
   parser.add_argument('-i', required=True)
   parser.add_argument('-o', default='norm_vals.h5')
+  parser.add_argument('--ave_charge', action='store_true')
   args = parser.parse_args()
-  bf = BeamFeatures.BeamFeatures(args.i) #'/home/jake/GNN_work/data/merged.h5')
+  bf = BeamFeatures.BeamFeatures(args.i, ave_charge=args.ave_charge) #'/home/jake/GNN_work/data/merged.h5')
 
   xs = []
   nentries = len(bf)

@@ -88,7 +88,15 @@ class GlobalModel(torch.nn.Module):
         return self.global_mlp(out)
 
 class GNNModel(nn.Module):
-    def __init__(self, do_frac=False, outdim=6, node_input=9, edge_input=12):
+    def __init__(
+        self,
+        do_frac=False,
+        outdim=6,
+        node_input=9,
+        edge_input=12,
+        node_output=64,
+        edge_output=64,
+    ):
         super().__init__()
 
         # Initialize the updaters
@@ -97,8 +105,8 @@ class GNNModel(nn.Module):
         # Update the node and edge feature N times (number of message passings, here = 3)
         #node_input  = 9 # Number of input node features
         #edge_input  = 12 # Number of input edge features -- update when ready
-        node_output = 64  # Number of intermediate node features
-        edge_output = 64  # Number of intermediate edge features
+        #node_output = 64  # Number of intermediate node features
+        #edge_output = 64  # Number of intermediate edge features
         leakiness = 0.1 # LeakyRELU activation leakiness
         #self.num_mp = 3 # Number of message passings
 

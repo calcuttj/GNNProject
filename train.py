@@ -67,9 +67,10 @@ if __name__ == '__main__':
   parser.add_argument('--checkpoint', default=None, type=str)
   parser.add_argument('--ave_charge', action='store_true')
   parser.add_argument('--learning_rate', '--lr', type=float, default=1.e-2)
+  parser.add_argument('--layer_width', default=64, type=int)
   args = parser.parse_args()
 
-  good_styles = ['interaction', 'beam_frac', 'pdgs']
+  good_styles = ['interaction', 'beam_frac', 'pdgs', 'track_vs_shower']
   if args.style not in good_styles:
     combined = ', '.join(good_styles)
     raise Exception(f'Must supply --style as one of {combined}')
@@ -104,11 +105,20 @@ if __name__ == '__main__':
       weights = torch.tensor(fweight['weights']).float().to(device)
       
 
+  ndim = {
+    'beam_frac':1,
+    'interaction':6,
+    'pdgs':4,
+    'track_vs_shower':2,
+  }
   net = model.GNNModel(
       (args.style == 'beam_frac'),
-      outdim=(6 if args.style == 'interaction' else 4),
+      #outdim=(6 if args.style == 'interaction' else 4),
+      outdim=ndim[args.style],
       node_input=(4 if args.ave_charge else 9),
       edge_input=(8 if args.ave_charge else 12),
+      node_output=args.layer_width,
+      edge_output=args.layer_width,
   )
 
   #loss_fn = torch.nn.BCELoss(reduction='mean', weight=weights)
