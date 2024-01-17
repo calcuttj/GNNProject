@@ -158,3 +158,76 @@ class GNNModel(nn.Module):
         u_pred = self.global_predictor(u)
         return u_pred
 
+class NuModel(nn.Module):
+    def __init__(
+        self,
+        active_branches={
+          'sign':1,
+          'flavor':4,
+          'mode':4,
+          'protons':4,
+          'pions':4,
+          'pi0s':4,
+          'neutrons':4,
+        },
+        node_input=9,
+        edge_input=12,
+        node_output=64,
+        edge_output=64,
+    ):
+        super().__init__()
+
+        # Initialize the updaters
+        #self.message_passing = torch.nn.ModuleList()
+
+        # Update the node and edge feature N times (number of message passings, here = 3)
+        leakiness = 0.1 # LeakyRELU activation leakiness
+        #self.num_mp = 3 # Number of message passings
+
+        self.message_pass = MetaLayer(
+          edge_model=EdgeModel(node_input, edge_input, edge_output), #Add leakiness?
+          node_model=NodeModel(node_input, node_output, edge_output), #Add leakiness?
+          global_model=GlobalModel(node_output, node_output), #Add leakiness?
+        )
+        self.branches = active_branches
+        #for i in range(self.num_mp):
+        #    self.message_passing.append(
+        #        MetaLayer(
+        #            edge_model = EdgeLayer(node_input, edge_input, edge_output, leakiness=leakiness),
+        #            node_model = NodeLayer(node_input, node_output, edge_output, leakiness=leakiness)
+        #        )
+        #    )
+        #    node_input = node_output
+        #    edge_input = edge_output
+        #    global_input = globa_output
+
+
+        # Reduce the number of node and edge features edge, as we are performing a simple classification
+        #self.node_predictor = nn.Linear(node_output, 2)
+        #self.edge_predictor = nn.Linear(edge_output, 2)
+
+        #self.global_predictor = nn.Sequential(
+        #  nn.Linear(node_output, self.outdim),
+        #  nn.Softmax(dim=1)
+        #)
+
+        #Make the dict of global predictors for each active branch
+        self.global_predictors = {
+          name:nn.Sequential(
+            nn.Linear(node_output, outdim),
+            nn.Sigmoid() if outdim==1 else nn.Softmax(dim=1)
+          ) for name,outdim in self.branches.items()
+        }
+
+    def forward(self, data, batch):
+
+        # Loop over message passing steps, pass data through the updaters
+        x = data.x
+        e = data.edge_attr
+        x, e, u = self.message_pass(x, data.edge_index, e, u=None, batch=batch)
+
+        u_pred = {
+          name:pred(u) for name,pred in self.global_predictors.items()
+        }
+        return u_pred
+

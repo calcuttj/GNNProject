@@ -9,7 +9,17 @@ class NuFeatures(GraphDataset):
     """
     TODO ADD DESCRIPTION
     """
-    def __init__(self, file_path, norm_path=None, ave_charge=False, style='asdf'):
+    def __init__(self, file_path, norm_path=None, ave_charge=False,
+                 outbranches=[
+                     'sign',
+                     'flavor',
+                     'mode',
+                     'protons',
+                     'pions',
+                     'pi0s',
+                     'neutrons'
+                 ],
+                ):
         """
         Args: file_path ..... path to the HDF5 file that contains the feature data
         """
@@ -17,6 +27,7 @@ class NuFeatures(GraphDataset):
         self._file_path = file_path
         self._file_handle = None
         self.ave_charge = ave_charge
+        self.outbranches=outbranches
 
         with h5py.File(self._file_path, "r", swmr=True) as data_file:
             self._entries = len(data_file['node_features'])
@@ -36,6 +47,16 @@ class NuFeatures(GraphDataset):
           self.edge_stds = 1.
           self.has_norm = False
 
+        self.dname={
+          'sign':'truth_sign',
+          'flavor':'truth_current_flavor',
+          'mode':'truth_mode',
+          'kaons':'truth_n_kaons',
+          'neutrons':'truth_n_neutrons',
+          'pions':'truth_n_pions',
+          'protons':'truth_n_protons',
+          'pi0s':'truth_n_pi0s',
+        }
 
     def __del__(self):
         
@@ -88,36 +109,16 @@ class NuFeatures(GraphDataset):
         )
         #print(edge_index.shape, edge_features.shape)
 
-        #if self.style == "beam_frac":
-        #  truth = torch.tensor(
-        #    self._file_handle['beam_fraction'][idx].reshape(-1,1),
-        #    dtype=torch.float32
-        #  )
-        #elif self.style == "pdgs":
-        #  truth = torch.tensor(
-        #    self._file_handle['truth_pdg'][idx].reshape(-1,4),
-        #    dtype=torch.float32
-        #  )
-        #elif self.style == "track_vs_shower":
-        #  #truth_pdg = self._file_handle['truth_pdg'][idx].reshape(-1,4)
-        #  n = self._file_handle['truth_pdg'][idx].reshape(-1,4).shape[0]
-        #  truth = torch.tensor(
-        #    np.zeros((n,2)),
-        #    dtype=torch.float32
-        #  )
-        #  truth[:,0] = torch.tensor(
-        #    self._file_handle['truth_pdg'][idx].reshape(-1,4)[:,0]
-        #  )
-        #  truth[:,1] = 1. - truth[:,0]
-        #else:
-        truth = torch.tensor(
-            self._file_handle['truth_sign'][idx],
-            dtype=torch.float32
-        )
+        truths = [
+          torch.tensor(
+            self._file_handle[self.dname[s]][idx], dtype=torch.float32
+          ) for s in self.outbranches
+        ]
+
         return GraphData(x = node_features,
                          edge_index = edge_index,
                          edge_attr = edge_features,
-                         y = truth,
+                         y = torch.concat(truths),
                          edge_label = None,
                          index = idx)
 
